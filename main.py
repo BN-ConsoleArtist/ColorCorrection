@@ -6,7 +6,7 @@ from colour_checker_detection import detect_colour_checkers_segmentation
 
 
 def calculate_weights(color_checker_path):
-    # images should be raw / linear .cr2 files
+    # Images should be raw / linear .cr2 files
     with rawpy.imread(str(color_checker_path)) as raw:
         rgb_uint16 = raw.postprocess(gamma=(1, 1), no_auto_bright=True, output_bps=16)  # uint16 numpy array [x,y,[r,g,b]]
         rgb_float32 = rgb_uint16.astype(np.float32) / 65535.0  # cast to float32, normalize rgb values
