@@ -168,6 +168,7 @@ class Window(QMainWindow):
 
 
 if __name__ == "__main__":
+
     np.set_printoptions(suppress=True, precision=6)
     p_directory = Path('/Users/renderman/Documents/Python/Image_processing/Photogrammetry')
 
