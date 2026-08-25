@@ -9,4 +9,11 @@ Color Correction batch processor leveraging 'Color Checker Classic 24 After 2014
 Useful for color correcting large amounts of photographs for photogrammetry pipelines, etc. I have also included a Delta E function
 for calculating accuracy of each patch relative to the 'Color Checker Classic 24 After 2014' reference values
 
+Steps:
+1. Create a parent folder.
+2. Create subfolders for each photo session making sure you capture one picture of the Color Checker per session.
+3. Rename the Color Checker photo to 'calibration.cr2'.
+4. Place all of the .cr2 files in a new subfolder named 'images_source' under each session folder. Example: Photogrammetry/Rock_A/images_source/, Photogrammetry/Rock_B/images_source/, Photogrammetry/Rock_C/images_source/, etc.
+5. Point to the parent folder and run the script. It will scan all subfolders to validate, auto-detect the calibration.cr2 patch values, and output calibrated pictures.
+
    
