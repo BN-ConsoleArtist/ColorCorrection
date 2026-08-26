@@ -130,26 +130,31 @@ def validate_paths(parent_directory, log_callback=None):
                 log_callback(f"WARNING! No 'images_source' folder or color checker found in {source_path}")
     return sorted(v_paths)
 
-def process_images(image_paths, log_callback=None):
+def process_images(image_paths, export_format = '.tga', log_callback=None):
     for path in image_paths:
+        log_callback(f'\nProcessing subfolder: {path}')
         source_path = path / 'images_source'
         output_path = path / 'images_calibrated'
-        output_path.mkdir(exist_ok=True)
         c_checker_path = source_path/'calibration.cr2'.lower()
+
         weights_ccm = calculate_weights_ccm(raw_to_rgb(c_checker_path), validate=False)
         if weights_ccm is None:
             log_callback(f'WARNING! Patch detection failed on {c_checker_path}, skipping to next folder')
             continue
+        else:
+            log_callback(f'Creating output path {output_path}')
+            output_path.mkdir(exist_ok=True)
+
         w = weights_ccm[0]
         ccm = weights_ccm[1]
 
         for f in source_path.iterdir():
             if f.suffix.lower() == ".cr2":
-                log_callback(f'Processing {f}')
-                file_path = Path(output_path / f.name).with_suffix('.tga')
+                log_callback(f'\nProcessing {f}...')
+                file_path = Path(output_path / f.name).with_suffix(export_format)
                 processed_file = apply_weights_ccm(f, w, ccm)
                 if processed_file is not None:
-                    log_callback(f'Saving {file_path}')
+                    log_callback(f'Saving {file_path}...')
                     iio.imwrite(str(file_path), processed_file)
 
 def validate_color_correction(ccm, target, reference):
@@ -171,8 +176,6 @@ class Window(QMainWindow):
         super().__init__()
         self.parent_folder = "Choose Folder..."
         self.valid_paths = []
-        self.export_format = ['.tga', '.png', '.tif', '.jpg', '.bmp']
-        self.Dropdown_label = QLabel('Choose Export Format')
 
         # Set the window title and initial size
         self.setWindowTitle("Color Checker Batch Color Correction")
@@ -242,7 +245,8 @@ class Window(QMainWindow):
         self.dropdown = QComboBox()
         self.dropdown.setFixedSize(200, 25)
         # self.dropdown.setStyleSheet("background-color: white;")
-        self.dropdown.insertItems(0, self.export_format)
+        self.dropdown.insertItems(0, ['.tga', '.png', '.tif', '.jpg', '.bmp'])
+        self.dropdown.currentIndexChanged.connect(self.log_dropdown)
 
         # Create Terminal Widget
         self.terminal = QPlainTextEdit()
@@ -259,11 +263,12 @@ class Window(QMainWindow):
         HLayout1.addWidget(self.display_parent_folder)
         HLayout1.addWidget(self.folder_button)
 
-        VLayout1.setSpacing(25)
+        VLayout1.setSpacing(20)
         VLayout1.addWidget(self.search_button)
         VLayout1.addWidget(self.process_button)
         VLayout1.addWidget(self.Dropdown_label)
         VLayout1.addWidget(self.dropdown)
+
         VLayout1.addStretch()
 
 
@@ -316,15 +321,16 @@ class Window(QMainWindow):
         print("Background task started...")
         self.search_button.setEnabled(False)
         self.terminal.appendPlainText('\nProcessing images...')
-        process_images(self.valid_paths, self.terminal.appendPlainText)
+        process_images(self.valid_paths,self.dropdown.currentText(), self.terminal.appendPlainText)
         self.search_button.setEnabled(True)
         print("Background task finished!")
 
+    def log_dropdown(self):
+        self.terminal.appendPlainText(f'Export format changed to: {self.dropdown.currentText()}')
+
+
 
 if __name__ == "__main__":
-
-    np.set_printoptions(suppress=True, precision=6)
-    p_directory = Path('/Users/renderman/Documents/Python/Image_processing/Photogrammetry')
 
     # Create the application instance
     app = QApplication(sys.argv)
