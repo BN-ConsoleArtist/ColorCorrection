@@ -336,10 +336,6 @@ if __name__ == "__main__":
     # Start the event loop
     sys.exit(app.exec())
 
-    # valid_paths = validate_paths(p_directory)
-    #
-    # process_images(valid_paths)
-
 
 
 
