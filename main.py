@@ -1,6 +1,4 @@
-import sys
-
-import rawpy
+import sys, rawpy
 import numpy as np
 import imageio.v3 as iio
 from pathlib import Path
@@ -11,7 +9,6 @@ from PySide6.QtCore import QSize
 from PySide6.QtWidgets import (QPlainTextEdit, QLineEdit, QLabel, QApplication, QMainWindow, QPushButton,
                                QFileDialog, QVBoxLayout, QHBoxLayout, QBoxLayout, QWidget, QStyle, QTableWidget,
                                QTableWidgetItem, QComboBox)
-
 
 def raw_to_rgb(image_path):
     # Convert raw .CR2 files to a float32 linear sRGB NumPy Array
@@ -69,13 +66,17 @@ def calculate_wb_weights_llsr(target_patch):
     weight_values =  np.array([w_r, w_g, w_b])
     return weight_values
 
-def calculate_weights_ccm(file_path, validate=False):
+def calculate_weights_ccm(file_path, wb_method='LLSR', validate=False):
     rgb_float32 = file_path
     color_checker_patches = detect_colour_checkers_segmentation(rgb_float32, show=False)
     if not color_checker_patches:
         return None
 
-    wb_weights = calculate_wb_weights_llsr(color_checker_patches[0]) #LLSR weights
+    if wb_method == 'LLSR':
+         wb_weights = calculate_wb_weights_llsr(color_checker_patches[0]) #LLSR weights
+    else:
+        wb_weights = calculate_wb_weights_simple(color_checker_patches[0])
+
     color_checker_white_balanced = color_checker_patches[0] * wb_weights
 
     color_checker_reference_values = CCS_COLOURCHECKERS['ColorChecker24 - After November 2014']
@@ -97,7 +98,6 @@ def calculate_weights_ccm(file_path, validate=False):
             print(f'Patch {i + 1:02d} Delta E = {val:.4f}')
 
     return wb_weights, ccm
-
 
 def apply_weights_ccm(image_path, weights, ccm):
 
@@ -130,14 +130,14 @@ def validate_paths(parent_directory, log_callback=None):
                 log_callback(f"WARNING! No 'images_source' folder or color checker found in {source_path}")
     return sorted(v_paths)
 
-def process_images(image_paths, export_format = '.tga', log_callback=None):
+def process_images(image_paths, export_format = '.tga', wb_method='LLSR', log_callback=None):
     for path in image_paths:
         log_callback(f'\nProcessing subfolder: {path}')
         source_path = path / 'images_source'
         output_path = path / 'images_calibrated'
         c_checker_path = source_path/'calibration.cr2'.lower()
+        weights_ccm = calculate_weights_ccm(raw_to_rgb(c_checker_path), wb_method, validate=False)
 
-        weights_ccm = calculate_weights_ccm(raw_to_rgb(c_checker_path), validate=False)
         if weights_ccm is None:
             log_callback(f'WARNING! Patch detection failed on {c_checker_path}, skipping to next folder')
             continue
@@ -169,8 +169,6 @@ def validate_color_correction(ccm, target, reference):
     delta_e_values = delta_E(target_lab, reference_lab, method='CIE 2000')
     return delta_e_values
 
-
-
 class Window(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -196,7 +194,6 @@ class Window(QMainWindow):
         VLayout1 = QVBoxLayout()
         VLayout1.setDirection(QBoxLayout.Direction.TopToBottom)
 
-
         # Create button widgets
         self.folder_button = QPushButton()
         self.folder_button.setFixedSize(32, 32)
@@ -206,7 +203,6 @@ class Window(QMainWindow):
         self.folder_button.setIcon(folder_icon)
         self.folder_button.setIconSize(QSize(32, 32))
         self.folder_button.clicked.connect(self.get_parent_folder)
-
 
         self.search_button = QPushButton("Scan Parent Folder")
         self.search_button.setEnabled(False) #Keep disabled until initial file selected
@@ -218,8 +214,6 @@ class Window(QMainWindow):
         self.process_button.setFixedSize(200,50)
         self.process_button.clicked.connect(self.process_images)
 
-
-
         # Create file path text widgets
         self.display_parent_folder = QLineEdit(self.parent_folder)
         self.display_parent_folder.setReadOnly(True)
@@ -229,7 +223,7 @@ class Window(QMainWindow):
         self.label1 = QLabel("Parent Folder: ", self)
         self.label2 = QLabel("Search Directory: ", self)
         self.Dropdown_label = QLabel('Choose Export Format:')
-
+        self.Dropdown_wb_label = QLabel('Choose White Balance Method:')
 
         # #Creat Table Widget
         # self.table = QTableWidget()
@@ -241,22 +235,25 @@ class Window(QMainWindow):
         # self.table.setItem(2, 1, QTableWidgetItem("Parent Folder: "))
 
         #Create a Combo Box (drop down menu) Widget
-
         self.dropdown = QComboBox()
         self.dropdown.setFixedSize(200, 25)
         # self.dropdown.setStyleSheet("background-color: white;")
         self.dropdown.insertItems(0, ['.tga', '.png', '.tif', '.jpg', '.bmp'])
         self.dropdown.currentIndexChanged.connect(self.log_dropdown)
 
+        self.dropdown_wb = QComboBox()
+        self.dropdown_wb.setFixedSize(200, 25)
+        # self.dropdown_wb.setStyleSheet("background-color: white;")
+        self.dropdown_wb.insertItems(0, ['LLSR', 'Neutral 5'])
+        self.dropdown_wb.currentIndexChanged.connect(self.log_dropdown_wb)
+
         # Create Terminal Widget
         self.terminal = QPlainTextEdit()
         self.terminal.setReadOnly(True)
-        self.terminal.setMaximumBlockCount(100)
-        self.terminal.appendPlainText('Log Updates...')
+        self.terminal.setMaximumBlockCount(1000)
+        self.terminal.appendPlainText('Log Updates...\n')
         self.terminal.setMinimumHeight(250)
         self.terminal.setStyleSheet("background-color: white;")
-
-
 
         # Assemble the layouts, add widgets, nest HLayouts under VLayout_main
         HLayout1.addWidget(self.label1)
@@ -268,19 +265,17 @@ class Window(QMainWindow):
         VLayout1.addWidget(self.process_button)
         VLayout1.addWidget(self.Dropdown_label)
         VLayout1.addWidget(self.dropdown)
+        VLayout1.addWidget(self.Dropdown_wb_label)
+        VLayout1.addWidget(self.dropdown_wb)
 
         VLayout1.addStretch()
-
-
 
         HLayout2.addLayout(VLayout1)
         HLayout2.addWidget(self.terminal)
 
-
         # Main assembly
         VLayout_main.addLayout(HLayout1)
         VLayout_main.addLayout(HLayout2)
-
 
       # Create a central widget, set the layout, and apply it to the QMainWindow
         central_widget = QWidget()
@@ -318,20 +313,18 @@ class Window(QMainWindow):
         self.search_button.setEnabled(True)
 
     def process_images(self):
-        print("Background task started...")
         self.search_button.setEnabled(False)
         self.terminal.appendPlainText('\nProcessing images...')
-        process_images(self.valid_paths,self.dropdown.currentText(), self.terminal.appendPlainText)
+        process_images(self.valid_paths,self.dropdown.currentText(),self.dropdown_wb.currentText(), self.terminal.appendPlainText)
         self.search_button.setEnabled(True)
-        print("Background task finished!")
 
     def log_dropdown(self):
         self.terminal.appendPlainText(f'Export format changed to: {self.dropdown.currentText()}')
-
+    def log_dropdown_wb(self):
+        self.terminal.appendPlainText(f'White balance method changed to: {self.dropdown_wb.currentText()}')
 
 
 if __name__ == "__main__":
-
     # Create the application instance
     app = QApplication(sys.argv)
 
