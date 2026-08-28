@@ -296,6 +296,7 @@ class Window(QMainWindow):
         self.display_parent_folder.setText(str(self.parent_folder))
         self.terminal.appendPlainText(f'Parent folder: {str(self.parent_folder)}')
         self.search_button.setEnabled(True)
+        self.process_button.setEnabled(False)
 
     def scan_folders(self):
         self.search_button.setEnabled(False)
