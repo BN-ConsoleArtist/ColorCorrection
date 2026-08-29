@@ -21,7 +21,7 @@ def raw_to_rgb(image_path):
                 # disable rawpy white balancing
                 use_camera_wb=False,
                 use_auto_wb=False,
-                user_wb=[1.0, 1.0, 1.0, 1.0],  # Forces a 1.0 multiplier across R, G, B, and G2
+                user_wb=None,
 
                 # disable rawpy CCM
                 output_color=rawpy.ColorSpace.raw
@@ -68,7 +68,7 @@ def calculate_wb_weights_llsr(target_patch):
 
 def calculate_weights_ccm(file_path, wb_method='LLSR', validate=False):
     rgb_float32 = file_path
-    color_checker_patches = detect_colour_checkers_segmentation(rgb_float32, show=False)
+    color_checker_patches = detect_colour_checkers_segmentation(rgb_float32, show=True)
     if not color_checker_patches:
         return None
 
@@ -126,8 +126,10 @@ def validate_paths(parent_directory, log_callback=None):
             color_checker = source_path / 'calibration.cr2'.lower()
             if source_path.is_dir() and color_checker.is_file():
                 v_paths.append(path)
+            elif not source_path.is_dir():
+                log_callback(f"WARNING! No 'images_source' folder found in {path}")
             else:
-                log_callback(f"WARNING! No 'images_source' folder or color checker found in {source_path}")
+                log_callback(f"WARNING! No 'calibration.cr2' file found in {source_path}")
     return sorted(v_paths)
 
 def process_images(image_paths, export_format = '.tga', wb_method='LLSR', log_callback=None):
@@ -235,15 +237,18 @@ class Window(QMainWindow):
         # self.table.setItem(2, 1, QTableWidgetItem("Parent Folder: "))
 
         #Create a Combo Box (drop down menu) Widget
+
+        drop_down_style_sheet = 'background-color: white; selection-background-color: lightgrey; selection-color: blue;'
+
         self.dropdown = QComboBox()
         self.dropdown.setFixedSize(200, 25)
-        # self.dropdown.setStyleSheet("background-color: white;")
+        self.dropdown.setStyleSheet(drop_down_style_sheet)
         self.dropdown.insertItems(0, ['.tga', '.png', '.tif', '.jpg', '.bmp'])
         self.dropdown.currentIndexChanged.connect(self.log_dropdown)
 
         self.dropdown_wb = QComboBox()
         self.dropdown_wb.setFixedSize(200, 25)
-        # self.dropdown_wb.setStyleSheet("background-color: white;")
+        self.dropdown_wb.setStyleSheet(drop_down_style_sheet)
         self.dropdown_wb.insertItems(0, ['LLSR', 'Neutral 5'])
         self.dropdown_wb.currentIndexChanged.connect(self.log_dropdown_wb)
 
